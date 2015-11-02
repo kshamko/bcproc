@@ -19,12 +19,16 @@ start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 start_server(Name) ->
-  supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_sup, supervisor, [bcproc_broadcast_sup:get_sup_name(Name)])),
-  supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_server, worker, [Name])).
+  supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_sup, supervisor, bcproc_broadcast_sup:get_sup_name(Name))),
+  supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_server, worker, Name)).
 
 stop_server(Name) ->
-  supervisor:terminate_child(?MODULE, bcproc_broadcast_sup:get_sup_name(Name)),
-  supervisor:terminate_child(?MODULE, Name).
+  SupName = bcproc_broadcast_sup:get_sup_name(Name),
+  supervisor:terminate_child(?MODULE, Name),
+  supervisor:delete_child(?MODULE, Name),
+  supervisor:terminate_child(?MODULE, SupName),
+  supervisor:delete_child(?MODULE, SupName).
+
 
 %% ===================================================================
 %% Supervisor callbacks

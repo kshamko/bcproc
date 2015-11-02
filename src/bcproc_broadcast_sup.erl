@@ -39,7 +39,7 @@ start_link(SupName) ->
 %% @end
 %%--------------------------------------------------------------------
 start_subserver(ServerName, SubserverName) ->
-  Subserver = {SubserverName, {screen_broadcast_subserver, start_link, [SubserverName]}, transient, 2000, worker, [screen_broadcast_subserver]},
+  Subserver = {SubserverName, {bcproc_broadcast_subserver, start_link, [SubserverName]}, transient, 2000, worker, [bcproc_broadcast_subserver]},
   supervisor:start_child(get_sup_name(ServerName), Subserver).
 
 %%--------------------------------------------------------------------
@@ -49,7 +49,7 @@ start_subserver(ServerName, SubserverName) ->
 %% @end
 %%--------------------------------------------------------------------
 get_sup_name(ServerName) ->
-  list_to_atom(lists:cocat([ServerName] ++ ['_sup'])).
+  list_to_atom(lists:concat([ServerName] ++ ['_sup'])).
 
 %%%===================================================================
 %%% Supervisor callbacks

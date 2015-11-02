@@ -10,17 +10,25 @@
 -author("konstantin.shamko").
 
 %% API
--export([start_server/1, stop_server/1]).
+-export([start_server/1, stop_server/1, add_client/2, remove_client/2, broadcast/2]).
 
 
-start_server(Name) ->
-  bcproc_sup:start_server(Name).
+start_server(ServerName) ->
+  bcproc_sup:start_server(ServerName).
 
 
-stop_server(Name) ->
-  bcproc_sup:stop_server(Name).
+stop_server(ServerName) ->
+  bcproc_sup:stop_server(ServerName).
+
+
+add_client(ServerName, ClientPid) when is_pid(ClientPid) ->
+  bcproc_broadcast_server:add_client(ServerName, ClientPid).
+
+
+remove_client(ServerName, ClientPid) when is_pid(ClientPid) ->
+  bcproc_broadcast_server:remove_client(ServerName, ClientPid).
 
 
 broadcast(ServerName, Msg) ->
-  ok.
+  bcproc_broadcast_server:broadcast(ServerName, Msg).
 

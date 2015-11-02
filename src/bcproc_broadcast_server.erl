@@ -37,7 +37,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link(ServerName) ->
-  gen_server:start_link({local, ServerName}, ?MODULE, [], []).
+  gen_server:start_link({local, ServerName}, ?MODULE, [ServerName], []).
 
 %%-----------------------
 %% @doc
@@ -184,7 +184,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% @end
 %%--------------------------------------------------------------------
 start_subserver(State) ->
-  Count = list_to_binary(integer_to_list(State#state.subserversCount)),
+  Count = list_to_binary(lists:concat([State#state.serverName] ++ integer_to_list(State#state.subserversCount))),
   SubserverName = binary_to_atom(<<"broadcast_subserver_", Count/binary>>, utf8),
   {ok, _} = bcproc_broadcast_sup:start_subserver(State#state.serverName, SubserverName),
   Subservers = State#state.subservers ++ [SubserverName],
