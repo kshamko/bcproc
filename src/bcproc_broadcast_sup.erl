@@ -49,7 +49,7 @@ start_subserver(ServerName, SubserverName) ->
 %% @end
 %%--------------------------------------------------------------------
 get_sup_name(ServerName) ->
-  list_to_atom([ServerName] ++ [sup]).
+  list_to_atom(lists:cocat([ServerName] ++ ['_sup'])).
 
 %%%===================================================================
 %%% Supervisor callbacks
