@@ -19,7 +19,7 @@ start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 start_server(Name) ->
-  supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_sup, supervisor, [get_sup_name(Name)])),
+  supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_sup, supervisor, [bcproc_broadcast_sup:get_sup_name(Name)])),
   supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_server, worker, [Name])).
 
 stop_server(Name) ->
@@ -38,6 +38,5 @@ init([]) ->
 %% Private functions
 %% ===================================================================
 
-get_sup_name(ServerName) ->
-  list_to_atom([ServerName] ++ [sup]).
+
 

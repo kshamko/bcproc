@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, add_client/1, terminate_client/1, broadcast/1]).
+-export([start_link/1, add_client/2, remove_client/2, broadcast/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -22,12 +22,9 @@
   terminate/2,
   code_change/3]).
 
--define(SERVER, ?MODULE).
 -define(PROCESSES_TO_SUBSERVER, 250).
 
--record(state, {currentSubserver, subserversCount = 0, subservers = []}).
-
-
+-record(state, {serverName, currentSubserver, subserversCount = 0, subservers = []}).
 
 %%%===================================================================
 %%% API
@@ -39,23 +36,38 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(ServerName) ->
+  gen_server:start_link({local, ServerName}, ?MODULE, [], []).
 
-%-----------------------
-%
-%-----------------------
-add_client(Pid) ->
-  case is_pid(Pid) of
-    true -> gen_server:cast(?SERVER, {add_client, Pid});
+%%-----------------------
+%% @doc
+%% Add client to brodcast messages to
+%%
+%% @end
+%%-----------------------
+add_client(ServerName, ClientPid) ->
+  case is_pid(ClientPid) of
+    true -> gen_server:cast(ServerName, {add_client, ClientPid});
     _ -> {error, "No Pid provided"}
   end.
 
-terminate_client(Pid) ->
-  gen_server:cast(?SERVER, {terminate_client, Pid}).
+%%-----------------------
+%% @doc
+%% Remove client from broadcast server
+%%
+%% @end
+%%-----------------------
+remove_client(ServerName, ClientPid) ->
+  gen_server:cast(ServerName, {remove_client, ClientPid}).
 
-broadcast(Msg) ->
-  gen_server:cast(?SERVER, {broadcast, Msg}).
+%%-----------------------
+%% @doc
+%% Make a broadcast
+%%
+%% @end
+%%-----------------------
+broadcast(ServerName, Msg) ->
+  gen_server:cast(ServerName, {broadcast, Msg}).
 
 
 %%%===================================================================
@@ -68,8 +80,8 @@ broadcast(Msg) ->
 %% Initializes the server
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-  {ok, #state{}}.
+init([ServerName]) ->
+  {ok, #state{ serverName = ServerName}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -78,19 +90,34 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+
+%%---------------------------------------
+%% Handele add client
+%%---------------------------------------
 handle_cast({add_client, ClientPid}, State) ->
   {SubCount, {SubName, Subservers}} = get_current_subserver(State),
-  screen_broadcast_subserver:add_client(SubName, ClientPid),
+  bcproc_broadcast_subserver:add_client(SubName, ClientPid),
   {noreply, State#state{currentSubserver = SubName, subserversCount = SubCount, subservers = Subservers}};
-handle_cast({terminate_client, ClientPid}, State) ->
+
+%%---------------------------------------
+%% Handle remove client
+%%---------------------------------------
+handle_cast({remove_client, ClientPid}, State) ->
   Subservers = State#state.subservers,
-  [ screen_broadcast_subserver:terminate_client(Subserver, ClientPid) || Subserver <- Subservers],
+  [ bcproc_broadcast_subserver:terminate_client(Subserver, ClientPid) || Subserver <- Subservers],
   {noreply, State};
+
+%%---------------------------------------
+%% Handle broadcast
+%%---------------------------------------
 handle_cast({broadcast, Msg}, State) ->
-  lager:log(info, self(), "Broadcast started"),
   Subservers = State#state.subservers,
-  [ screen_broadcast_subserver:broadcast(Subserver, Msg) || Subserver <- Subservers],
+  [ bcproc_broadcast_subserver:broadcast(Subserver, Msg) || Subserver <- Subservers],
   {noreply, State};
+
+%%---------------------------------------
+%% Catch all other cast messages
+%%---------------------------------------
 handle_cast(_Request, State) ->
   {noreply, State}.
 
@@ -148,19 +175,33 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @private
+%% @todo add configuration param for processes count threshold
+%% @doc
+%% Function takes curent process state and starts new subserver if required
+%% Desision is based on ?PROCESSES_TO_SUBSERVER constant's value
+%% @end
+%%--------------------------------------------------------------------
 start_subserver(State) ->
   Count = list_to_binary(integer_to_list(State#state.subserversCount)),
   SubserverName = binary_to_atom(<<"broadcast_subserver_", Count/binary>>, utf8),
-  {ok, _} = screen_broadcast_subserver_sup:start_subserver(SubserverName),
+  {ok, _} = bcproc_broadcast_sup:start_subserver(State#state.serverName, SubserverName),
   Subservers = State#state.subservers ++ [SubserverName],
   {SubserverName, Subservers}.
 
-
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Returns active subserver to add clients to.
+%%
+%% @end
+%%--------------------------------------------------------------------
 get_current_subserver(State) ->
   case State#state.currentSubserver of
     undefined -> {State#state.subserversCount + 1, start_subserver(State)};
     _->
-      case screen_broadcast_subserver:get_clients_count(State#state.currentSubserver) >= ?PROCESSES_TO_SUBSERVER of
+      case bcproc_broadcast_subserver:get_clients_count(State#state.currentSubserver) >= ?PROCESSES_TO_SUBSERVER of
         true -> {State#state.subserversCount + 1, start_subserver(State)};
         _ -> {State#state.subserversCount, {State#state.currentSubserver, State#state.subservers}}
       end

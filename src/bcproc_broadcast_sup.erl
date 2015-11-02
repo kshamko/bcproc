@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_subserver/1]).
+-export([start_link/1, start_subserver/2, get_sup_name/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -29,17 +29,27 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link() ->
-  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link() ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+start_link(SupName) ->
+  supervisor:start_link({local, SupName}, ?MODULE, []).
 
-%%-------------------------------
+%%--------------------------------------------------------------------
+%% @doc
+%% Starts the supervisor
 %%
-%%-------------------------------
-start_subserver(SubserverName) ->
-  Subserver = {{local, SubserverName}, {screen_broadcast_subserver, start_link, [SubserverName]}, transient, 2000, worker, [screen_broadcast_subserver]},
-  supervisor:start_child(?SERVER, Subserver).
+%% @end
+%%--------------------------------------------------------------------
+start_subserver(ServerName, SubserverName) ->
+  Subserver = {SubserverName, {screen_broadcast_subserver, start_link, [SubserverName]}, transient, 2000, worker, [screen_broadcast_subserver]},
+  supervisor:start_child(get_sup_name(ServerName), Subserver).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Starts the supervisor
+%%
+%% @end
+%%--------------------------------------------------------------------
+get_sup_name(ServerName) ->
+  list_to_atom([ServerName] ++ [sup]).
 
 %%%===================================================================
 %%% Supervisor callbacks
