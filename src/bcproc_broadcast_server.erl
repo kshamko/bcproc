@@ -24,7 +24,7 @@
 
 -define(PROCESSES_TO_SUBSERVER, 250).
 
--record(state, {serverName, subserverSup}).
+-record(state, {serverName, subserverSup, subservers}).
 
 %%%===================================================================
 %%% API
@@ -81,7 +81,8 @@ broadcast(ServerName, Msg) ->
 %% @end
 %%--------------------------------------------------------------------
 init([ServerName, SubserversSupName ]) ->
-  {ok, #state{ serverName = ServerName, subserverSup = SubserversSupName}}.
+  {_, Subservers} = start_subserver(SubserversSupName),
+  {ok, #state{ serverName = ServerName, subserverSup = SubserversSupName, subservers = Subservers}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -95,9 +96,9 @@ init([ServerName, SubserversSupName ]) ->
 %% Handele add client
 %%---------------------------------------
 handle_cast({add_client, ClientPid}, State) ->
-  SubserverPid = get_current_subserver(State),
+  {SubserverPid, Subservers} = get_current_subserver(State),
   bcproc_broadcast_subserver:add_client(SubserverPid, ClientPid),
-  {noreply, State};
+  {noreply, State#state{subservers = Subservers}};
 
 %%---------------------------------------
 %% Handle remove client
@@ -177,18 +178,33 @@ code_change(_OldVsn, State, _Extra) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @todo add configuration param for processes count threshold
 %% @doc
 %% Function takes curent process state and starts new subserver if required
 %% Desision is based on ?PROCESSES_TO_SUBSERVER constant's value
 %% @end
 %%--------------------------------------------------------------------
 start_subserver(SupevisorName) ->
+  LatestName = latest_name(SupevisorName),
   {ok, SubserverPid} = bcproc_broadcast_sup:start_subserver(SupevisorName),
-  SubserverPid.
+  register_latest_subserver(SubserverPid, LatestName, whereis(LatestName)),
+  {SubserverPid, supervisor:which_children(SupevisorName)}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Register latest started subserver under a name
+%%
+%% @end
+%%--------------------------------------------------------------------
+register_latest_subserver(LatestPid, Name, undefined) ->
+  register(Name, LatestPid);
+register_latest_subserver(LatestPid, Name, _OldPid) ->
+  unregister(Name),
+  register_latest_subserver(LatestPid, Name, undefined).
 
 
 %%--------------------------------------------------------------------
+%% @todo add configuration param for processes count threshold
 %% @private
 %% @doc
 %% Returns active subserver to add clients to.
@@ -196,16 +212,15 @@ start_subserver(SupevisorName) ->
 %% @end
 %%--------------------------------------------------------------------
 get_current_subserver(State) ->
-  Subservers = supervisor:which_children(State#state.subserverSup),
+  CurPid = whereis(latest_name(State#state.subserverSup)),
 
-  case Subservers of
-    [] -> start_subserver(State#state.subserverSup);
-    [{_, CurPid, _, _}|_Tail]->
-      CountSubservers = bcproc_broadcast_subserver:get_clients_count(CurPid),
-      case CountSubservers >= ?PROCESSES_TO_SUBSERVER of
-        true -> start_subserver(State#state.subserverSup);
-        _ -> CurPid
-      end
+  CountSubservers = bcproc_broadcast_subserver:get_clients_count(CurPid),
+  case CountSubservers >= ?PROCESSES_TO_SUBSERVER of
+    true ->
+      start_subserver(State#state.subserverSup);
+    _ -> {CurPid, State#state.subservers}
   end.
 
+latest_name(SupevisorName) ->
+  list_to_atom(lists:concat([SupevisorName] ++ ['_latest_child'])).
 
