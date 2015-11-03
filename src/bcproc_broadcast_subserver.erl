@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, broadcast/2, get_clients_count/1, add_client/2, terminate_client/2]).
+-export([start_link/0, broadcast/2, get_clients_count/1, add_client/2, terminate_client/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -36,8 +36,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(ProcName) ->
-  gen_server:start_link({local, ProcName}, ?MODULE, [], []).
+start_link() ->
+  gen_server:start_link(?MODULE, [], []).
 
 %%--------------------------------------------------------------------
 %% @doc

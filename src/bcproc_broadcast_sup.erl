@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/1, start_subserver/2, get_sup_name/1]).
+-export([start_link/1, start_subserver/1, get_sup_name/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -38,9 +38,9 @@ start_link(SupName) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_subserver(ServerName, SubserverName) ->
-  Subserver = {SubserverName, {bcproc_broadcast_subserver, start_link, [SubserverName]}, transient, 2000, worker, [bcproc_broadcast_subserver]},
-  supervisor:start_child(get_sup_name(ServerName), Subserver).
+start_subserver(SupervisorName) ->
+  supervisor:start_child(SupervisorName, []).
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -68,8 +68,8 @@ get_sup_name(ServerName) ->
 init([]) ->
   MaxRestarts = 5,
   MaxTime = 240,
-  {ok, {{one_for_one, MaxRestarts, MaxTime}, [
-
+  {ok, {{simple_one_for_one, MaxRestarts, MaxTime}, [
+    {bcproc_broadcast_subserver, {bcproc_broadcast_subserver, start_link, []}, transient, 2000, worker, [bcproc_broadcast_subserver]}
   ]}}.
 
 %%%===================================================================
