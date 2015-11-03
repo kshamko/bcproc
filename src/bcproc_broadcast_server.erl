@@ -197,11 +197,11 @@ start_subserver(SupevisorName) ->
 %%--------------------------------------------------------------------
 get_current_subserver(State) ->
   Subservers = supervisor:which_children(State#state.subserverSup),
-  [_,_,_,{workers, CountSubservers}] = supervisor:count_children(State#state.subserverSup),
 
   case Subservers of
     [] -> start_subserver(State#state.subserverSup);
     [{_, CurPid, _, _}|_Tail]->
+      CountSubservers = bcproc_broadcast_subserver:get_clients_count(CurPid),
       case CountSubservers >= ?PROCESSES_TO_SUBSERVER of
         true -> start_subserver(State#state.subserverSup);
         _ -> CurPid
