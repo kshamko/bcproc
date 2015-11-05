@@ -127,13 +127,10 @@ handle_cast({terminate_client, ClientPid}, State) ->
   {noreply, State#state{clientsCount = ClientsCount, clients = Clients}};
 
 handle_cast({broadcast, Msg}, State) ->
-
   Clients = State#state.clients,
-  Message = {struct,[{data, Msg}, {date, os:system_time()}]},
-
   dict:map(
     fun(WsPid, _Value) when is_pid(WsPid) ->
-      WsPid ! {text, mochijson2:encode(Message)}
+      WsPid ! {text, Msg}
     end,
     Clients),
 
