@@ -1,23 +1,23 @@
 %%%-------------------------------------------------------------------
 %%% @author konstantin.shamko
-%%% @copyright (C) 2015, Oxagile LLC
+%%% @copyright (C) 2015
 %%% @doc
 %%%
 %%% @end
-%%% Created : 02. Nov 2015 2:30 PM
+%%% Created : 09. Nov 2015 1:50 PM
 %%%-------------------------------------------------------------------
--module(bcproc_broadcast_sup).
+-module(bcproc_cleaner_sup).
 -author("konstantin.shamko").
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/1, start_subserver/2, get_sup_name/1]).
+-export([start_link/0]).
 
 %% Supervisor callbacks
--export([init/1]).
+-export([init/1, start_cleaner/0]).
 
--define(SERVER, ?MODULE).
+-define(SUPERVISOR, ?MODULE).
 
 %%%===================================================================
 %%% API functions
@@ -29,27 +29,19 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link(SupName) ->
-  supervisor:start_link({local, SupName}, ?MODULE, []).
+-spec(start_link() ->
+  {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
+start_link() ->
+  supervisor:start_link({local, ?SUPERVISOR}, ?MODULE, []).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Starts the supervisor
+%% Starts cleaner server
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_subserver(SupervisorName, ServerName) ->
-  supervisor:start_child(SupervisorName, [ServerName]).
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the supervisor
-%%
-%% @end
-%%--------------------------------------------------------------------
-get_sup_name(ServerName) ->
-  list_to_atom(lists:concat([ServerName] ++ ['_sup'])).
+start_cleaner() ->
+  supervisor:start_child(?SUPERVISOR, []).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -65,14 +57,13 @@ get_sup_name(ServerName) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-  MaxRestarts = 5,
-  MaxTime = 240,
-  {ok, {{simple_one_for_one, MaxRestarts, MaxTime}, [
-    {bcproc_broadcast_subserver, {bcproc_broadcast_subserver, start_link, []}, transient, 2000, worker, [bcproc_broadcast_subserver]}
-  ]}}.
+  init([]) ->
+    MaxRestarts = 5,
+    MaxTime = 240,
+    {ok, {{simple_one_for_one, MaxRestarts, MaxTime}, [
+      {bcproc_cleaner_server, {bcproc_cleaner_server, start_link, []}, transient, 2000, worker, [bcproc_cleaner_server]}
+    ]}}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-

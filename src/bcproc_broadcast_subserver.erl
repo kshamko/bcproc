@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, broadcast/2, get_clients_count/1, add_client/2, terminate_client/2]).
+-export([start_link/1, broadcast/2, get_clients_count/1, add_client/2, terminate_client/2, set_clean_pids/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -23,8 +23,9 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
+-define(CLEANUP_TIME,  30 * 1000). %run tokens cleanup every 30 seconds
 
--record(state, {clientsCount = 0, clients = dict:new()}).
+-record(state, {clientsCount = 0, clients = dict:new(), server}).
 
 %%%===================================================================
 %%% API
@@ -36,8 +37,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-  gen_server:start_link(?MODULE, [], []).
+start_link(ServerName) ->
+  gen_server:start_link(?MODULE, [ServerName], []).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -72,6 +73,13 @@ terminate_client(ProcName, ClientPid) ->
 broadcast(ProcName, Msg) ->
   gen_server:cast(ProcName, {broadcast, Msg}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%%
+%% @end
+%%--------------------------------------------------------------------
+set_clean_pids(SubserverPid, PidDict, PidCount) ->
+  gen_server:call(SubserverPid, {set_clean_pids, PidDict, PidCount}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -88,8 +96,9 @@ broadcast(ProcName, Msg) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-  {ok, #state{}}.
+init([ServerName]) ->
+  erlang:send_after(?CLEANUP_TIME, self(), cleanup),
+  {ok, #state{server = ServerName}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -100,6 +109,15 @@ init([]) ->
 %%--------------------------------------------------------------------
 handle_call(get_count_clients, _From, State) ->
   {reply, State#state.clientsCount, State};
+handle_call({set_clean_pids, PidDict, PidCount}, _From, State) ->
+  case PidCount of
+    0 ->
+      bcproc_broadcast_server:remove_subserver(State#state.server, self()),
+      {stop, normal, ok, State};
+    _ ->
+      {reply, ok, State#state{clients = PidDict, clientsCount = PidCount}}
+  end;
+
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
@@ -110,7 +128,7 @@ handle_call(_Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({add_client, ClientPid}, State) ->
+handle_cast({add_client, ClientPid}, State)->
   case dict:find(ClientPid, State#state.clients) of
     error ->
       ClientsCount = State#state.clientsCount + 1,
@@ -148,6 +166,12 @@ handle_cast(_Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(cleanup, State) ->
+  Clients = State#state.clients,
+  {ok, CleanerPid} = bcproc_cleaner_sup:start_cleaner(),
+  bcproc_cleaner_server:clean(CleanerPid, Clients, self()),
+  erlang:send_after(?CLEANUP_TIME, self(), cleanup),
+  {noreply, State};
 handle_info(_Info, State) ->
   {noreply, State}.
 
@@ -162,6 +186,8 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
+terminate(normal, _State) ->
+  normal;
 terminate(_Reason, _State) ->
   ok.
 

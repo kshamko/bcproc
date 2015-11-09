@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2, add_client/2, remove_client/2, broadcast/2]).
+-export([start_link/2, add_client/2, remove_client/2, broadcast/2, remove_subserver/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -69,6 +69,14 @@ remove_client(ServerName, ClientPid) ->
 broadcast(ServerName, Msg) ->
   gen_server:cast(ServerName, {broadcast, Msg}).
 
+%%-----------------------
+%% @doc
+%% Remove subserver
+%%
+%% @end
+%%-----------------------
+remove_subserver(ServerName, SubserverPid) ->
+  gen_server:cast(ServerName, {remove_subserver, SubserverPid}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -81,7 +89,7 @@ broadcast(ServerName, Msg) ->
 %% @end
 %%--------------------------------------------------------------------
 init([ServerName, SubserversSupName ]) ->
-  {_, Subservers} = start_subserver(SubserversSupName),
+  {_, Subservers} = start_subserver(SubserversSupName, ServerName),
   {ok, #state{ serverName = ServerName, subserverSup = SubserversSupName, subservers = Subservers}}.
 
 %%--------------------------------------------------------------------
@@ -115,7 +123,12 @@ handle_cast({broadcast, Msg}, State) ->
   Subservers = supervisor:which_children(State#state.subserverSup),
   [ bcproc_broadcast_subserver:broadcast(Subserver, Msg) || {_,Subserver,_,_} <- Subservers],
   {noreply, State};
-
+%%---------------------------------------
+%% remove subserver
+%%---------------------------------------
+handle_cast({remove_subserver, SubserverPid}, State) ->
+  Subservers = lists:delete(SubserverPid, State#state.subservers),
+  {noreply, State#state{subservers = Subservers}};
 %%---------------------------------------
 %% Catch all other cast messages
 %%---------------------------------------
@@ -183,9 +196,9 @@ code_change(_OldVsn, State, _Extra) ->
 %% Desision is based on ?PROCESSES_TO_SUBSERVER constant's value
 %% @end
 %%--------------------------------------------------------------------
-start_subserver(SupevisorName) ->
+start_subserver(SupevisorName, ServerName) ->
   LatestName = latest_name(SupevisorName),
-  {ok, SubserverPid} = bcproc_broadcast_sup:start_subserver(SupevisorName),
+  {ok, SubserverPid} = bcproc_broadcast_sup:start_subserver(SupevisorName, ServerName),
   register_latest_subserver(SubserverPid, LatestName, whereis(LatestName)),
   {SubserverPid, supervisor:which_children(SupevisorName)}.
 
@@ -217,7 +230,7 @@ get_current_subserver(State) ->
   CountSubservers = bcproc_broadcast_subserver:get_clients_count(CurPid),
   case CountSubservers >= ?PROCESSES_TO_SUBSERVER of
     true ->
-      start_subserver(State#state.subserverSup);
+      start_subserver(State#state.subserverSup, State#state.serverName);
     _ -> {CurPid, State#state.subservers}
   end.
 
