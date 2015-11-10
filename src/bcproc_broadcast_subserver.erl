@@ -118,7 +118,7 @@ handle_call({set_clean_pids, PidDict, 0}, _From, State) ->
       {reply, ok, State#state{clients = PidDict, clientsCount = 0}}
   end;
 handle_call({set_clean_pids, PidDict, PidCount}, _From, State) ->
-      {reply, ok, State#state{clients = PidDict, clientsCount = PidCount}};
+  {reply, ok, State#state{clients = PidDict, clientsCount = PidCount}};
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
