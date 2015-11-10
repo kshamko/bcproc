@@ -234,6 +234,13 @@ get_current_subserver(State) ->
     _ -> {CurPid, State#state.subservers}
   end.
 
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Register latest started subserver under a name
+%%
+%% @end
+%%--------------------------------------------------------------------
 latest_name(SupevisorName) ->
   list_to_atom(lists:concat([SupevisorName] ++ ['_latest_child'])).
 
