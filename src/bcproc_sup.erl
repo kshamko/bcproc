@@ -25,10 +25,10 @@ start_server(Name) ->
 
 stop_server(Name) ->
   SupName = bcproc_broadcast_sup:get_sup_name(Name),
-  supervisor:terminate_child(?MODULE, Name),
-  supervisor:delete_child(?MODULE, Name),
-  supervisor:terminate_child(?MODULE, SupName),
-  supervisor:delete_child(?MODULE, SupName).
+  supervisor:terminate_child(?MODULE, {local, Name}),
+  supervisor:delete_child(?MODULE, {local, Name}),
+  supervisor:terminate_child(?MODULE, {local, SupName}),
+  supervisor:delete_child(?MODULE, {local, SupName}).
 
 
 %% ===================================================================
