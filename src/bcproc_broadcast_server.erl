@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2, add_client/2, remove_client/2, broadcast/2, remove_subserver/2]).
+-export([start_link/2, add_client/2, remove_client/2, broadcast/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -24,7 +24,7 @@
 
 -define(PROCESSES_TO_SUBSERVER, 250).
 
--record(state, {serverName, subserverSup, subservers}).
+-record(state, {serverName, subserverSup}).
 
 %%%===================================================================
 %%% API
@@ -69,15 +69,6 @@ remove_client(ServerName, ClientPid) ->
 broadcast(ServerName, Msg) ->
   gen_server:cast(ServerName, {broadcast, Msg}).
 
-%%-----------------------
-%% @doc
-%% Remove subserver
-%%
-%% @end
-%%-----------------------
-remove_subserver(ServerName, SubserverPid) ->
-  gen_server:cast(ServerName, {remove_subserver, SubserverPid}).
-
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -89,8 +80,8 @@ remove_subserver(ServerName, SubserverPid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([ServerName, SubserversSupName ]) ->
-  {_, Subservers} = start_subserver(SubserversSupName, ServerName),
-  {ok, #state{ serverName = ServerName, subserverSup = SubserversSupName, subservers = Subservers}}.
+  start_subserver(SubserversSupName, ServerName),
+  {ok, #state{ serverName = ServerName, subserverSup = SubserversSupName}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -104,9 +95,9 @@ init([ServerName, SubserversSupName ]) ->
 %% Handele add client
 %%---------------------------------------
 handle_cast({add_client, ClientPid}, State) ->
-  {SubserverPid, Subservers} = get_current_subserver(State),
+  SubserverPid = get_current_subserver(State),
   bcproc_broadcast_subserver:add_client(SubserverPid, ClientPid),
-  {noreply, State#state{subservers = Subservers}};
+  {noreply, State};
 
 %%---------------------------------------
 %% Handle remove client
@@ -123,12 +114,6 @@ handle_cast({broadcast, Msg}, State) ->
   Subservers = supervisor:which_children(State#state.subserverSup),
   [ bcproc_broadcast_subserver:broadcast(Subserver, Msg) || {_,Subserver,_,_} <- Subservers],
   {noreply, State};
-%%---------------------------------------
-%% remove subserver
-%%---------------------------------------
-handle_cast({remove_subserver, SubserverPid}, State) ->
-  Subservers = supervisor:which_children(State#state.subserverSup),
-  {noreply, State#state{subservers = Subservers}};
 %%---------------------------------------
 %% Catch all other cast messages
 %%---------------------------------------
@@ -200,7 +185,7 @@ start_subserver(SupevisorName, ServerName) ->
   LatestName = latest_name(SupevisorName),
   {ok, SubserverPid} = bcproc_broadcast_sup:start_subserver(SupevisorName, ServerName),
   register_latest_subserver(SubserverPid, LatestName, whereis(LatestName)),
-  {SubserverPid, supervisor:which_children(SupevisorName)}.
+  SubserverPid.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -231,7 +216,7 @@ get_current_subserver(State) ->
   case CountSubservers >= ?PROCESSES_TO_SUBSERVER of
     true ->
       start_subserver(State#state.subserverSup, State#state.serverName);
-    _ -> {CurPid, State#state.subservers}
+    _ -> CurPid
   end.
 
 %%--------------------------------------------------------------------

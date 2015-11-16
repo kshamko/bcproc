@@ -111,11 +111,8 @@ handle_call(get_count_clients, _From, State) ->
   {reply, State#state.clientsCount, State};
 handle_call({set_clean_pids, PidDict, 0}, _From, State) ->
   case process_info(self(), registered_name) of
-    [] ->
-      bcproc_broadcast_server:remove_subserver(State#state.server, self()),
-      {stop, normal, ok, State};
-    {registered_name, _Name} ->
-      {reply, ok, State#state{clients = PidDict, clientsCount = 0}}
+    [] -> {stop, normal, ok, State};
+    {registered_name, _Name} ->  {reply, ok, State#state{clients = PidDict, clientsCount = 0}}
   end;
 handle_call({set_clean_pids, PidDict, PidCount}, _From, State) ->
   {reply, ok, State#state{clients = PidDict, clientsCount = PidCount}};
