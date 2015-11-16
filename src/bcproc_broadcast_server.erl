@@ -127,7 +127,7 @@ handle_cast({broadcast, Msg}, State) ->
 %% remove subserver
 %%---------------------------------------
 handle_cast({remove_subserver, SubserverPid}, State) ->
-  Subservers = lists:delete(SubserverPid, State#state.subservers),
+  Subservers = supervisor:which_children(State#state.subserverSup),
   {noreply, State#state{subservers = Subservers}};
 %%---------------------------------------
 %% Catch all other cast messages

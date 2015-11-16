@@ -10,7 +10,7 @@
 -export([init/1]).
 
 %% Helper macro for declaring children of supervisor
--define(BC_CHILD(I, Type, Params), {I, {I, start_link, Params}, transient, 5000, Type, [I]}).
+-define(BC_CHILD(I, Name, Type, Params), {{local, Name}, {I, start_link, Params}, transient, 5000, Type, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -20,8 +20,8 @@ start_link() ->
 
 start_server(Name) ->
   SupName = bcproc_broadcast_sup:get_sup_name(Name),
-  {ok, _} = supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_sup, supervisor, [SupName])),
-  {ok, _} = supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_server, worker, [Name, SupName])).
+  {ok, _} = supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_sup, SupName, supervisor, [SupName])),
+  {ok, _} = supervisor:start_child(?MODULE, ?BC_CHILD(bcproc_broadcast_server, Name, worker, [Name, SupName])).
 
 stop_server(Name) ->
   SupName = bcproc_broadcast_sup:get_sup_name(Name),
@@ -37,7 +37,7 @@ stop_server(Name) ->
 
 init([]) ->
   {ok, { {one_for_one, 5, 10}, [
-    ?BC_CHILD(bcproc_cleaner_sup, supervisor,[])
+    ?BC_CHILD(bcproc_cleaner_sup, bcproc_cleaner_sup, supervisor,[])
   ]} }.
 
 
