@@ -69,7 +69,7 @@ init([]) ->
   MaxRestarts = 5,
   MaxTime = 240,
   {ok, {{simple_one_for_one, MaxRestarts, MaxTime}, [
-    {bcproc_broadcast_subserver, {bcproc_broadcast_subserver, start_link, []}, transient, 2000, worker, [bcproc_broadcast_subserver]}
+    {bcproc_broadcast, {bcproc_broadcast, start_link, []}, transient, 2000, worker, [bcproc_broadcast]}
   ]}}.
 
 %%%===================================================================

@@ -81,7 +81,7 @@ handle_call(_Request, _From, State) ->
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_cast({clean, ProcDict, SubserverPid}, State) ->
   CleanProc = clean_proc_list(dict:to_list(ProcDict), ProcDict),
-  bcproc_broadcast_subserver:set_clean_pids(SubserverPid, CleanProc, dict:size(CleanProc)),
+  bcproc_broadcast:set_clean_pids(SubserverPid, CleanProc, dict:size(CleanProc)),
   {stop, normal, State};
 handle_cast(_Request, State) ->
   {noreply, State}.

@@ -6,13 +6,19 @@
 %%% @end
 %%% Created : 27. Oct 2015 1:22 PM
 %%%-------------------------------------------------------------------
--module(bcproc_broadcast_subserver).
+-module(bcproc_broadcast).
 -author("konstantin.shamko").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, broadcast/2, get_clients_count/1, add_client/2, terminate_client/2, set_clean_pids/3]).
+-export([
+  start_link/1,
+  broadcast/2,
+  get_clients_count/1,
+  add_client/2,
+  terminate_client/2,
+  set_clean_pids/3]).
 
 %% gen_server callbacks
 -export([init/1,
