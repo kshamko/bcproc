@@ -39,8 +39,9 @@
 %% where:
 %%    serverName: name of the pool process
 %%    broadcastSup: Name of the broadcast servers' supervisor
+%%    currentBc: name of current broadcast server
 %%----------------------------------------------------------------------
--record(state, {serverName, broadcastSup}).
+-record(state, {serverName, broadcastSup, currentBc}).
 
 %%%===================================================================
 %%% API
@@ -81,7 +82,7 @@ remove_client(ServerName, ClientPid) ->
 %% Function: broadcast/2
 %% Purpose: Tells pool to broadcast message to all attached broadcast servers
 %% Args:   ServerName - pool process name.
-%%         Client - pid or name of the process to sent broadcast message to
+%%         Msg - message to broadcast
 %% Returns: An atom 'ok' - basically this is a return of gen_server:cast
 %%----------------------------------------------------------------------
 broadcast(ServerName, Msg) ->
@@ -97,8 +98,9 @@ broadcast(ServerName, Msg) ->
 %% Returns: {ok, State}
 %%----------------------------------------------------------------------
 init([ServerName, BcSupName]) ->
-  start_bcserver(BcSupName, ServerName),
-  {ok, #state{ serverName = ServerName, broadcastSup = BcSupName}}.
+  LatestBcName = latest_bcname(BcSupName),
+  start_bcserver(BcSupName, ServerName, LatestBcName),
+  {ok, #state{ serverName = ServerName, broadcastSup = BcSupName, currentBc = LatestBcName}}.
 
 %%----------------------------------------------------------------------
 %% Function: handle_cast/2
@@ -113,9 +115,6 @@ handle_cast({add_client, ClientPid}, State) ->
   {noreply, State};
 %---------------------------------------
 % Handle remove client. Notifies all attached broadcast servers to remove client
-%---------------------------------------
-% ToDo: optimize this because to remove one client it's required to loop through
-%       all broadcast servers and clients attached to them
 %---------------------------------------
 handle_cast({remove_client, ClientPid}, State) ->
   BcServers = supervisor:which_children(State#state.broadcastSup),
@@ -178,61 +177,52 @@ code_change(_OldVsn, State, _Extra) ->
 %% Purpose: Start broadcast server
 %% Args:   PoolServerName - pool process name.
 %%         SupervisorName - name of supervisor for broadcast servers
+%%         LatestBcName - name of current broadcast server
 %% Returns: Pid of newly started broadcast server
 %%----------------------------------------------------------------------
-start_bcserver(SupervisorName, PoolServerName) ->
-  LatestName = latest_name(SupervisorName),
-  {ok, BcPid} = bcproc_broadcast_sup:start_subserver(SupervisorName, PoolServerName),
-  register_latest_subserver(BcPid, LatestName, whereis(LatestName)),
+start_bcserver(SupervisorName, PoolServerName, LatestBcName) ->
+  {ok, BcPid} = bcproc_broadcast_sup:start_bcserver(SupervisorName, PoolServerName),
+  register_latest_bcserver(BcPid, LatestBcName, whereis(LatestBcName)),
   BcPid.
 
 %%----------------------------------------------------------------------
-%% Function: broadcast/2
-%% Purpose: Tells pool to broadcast nessage to all binded broadcast servers
-%% Args:   ServerName - pool process name.
-%%         Client - pid or name of the process to sent broadcast message to
-%% Returns: An atom 'ok' - basically this is a return of gen_server:cast
+%% Function: register_latest_bcserver/3
+%% Purpose: Register newly created broadcast server under a Name.
+%% Args:   LatestPid - pid of newly create broadcast server
+%%         Name - name to register LatestPid under
+%%         OldPid - pid or 'undefined' atom - pid of previous broadcast server
+%% Returns: An atom 'true'
 %%----------------------------------------------------------------------
-register_latest_subserver(LatestPid, Name, undefined) ->
+register_latest_bcserver(LatestPid, Name, undefined) ->
   register(Name, LatestPid);
-register_latest_subserver(LatestPid, Name, _OldPid) ->
+register_latest_bcserver(LatestPid, Name, _OldPid) ->
   unregister(Name),
-  register_latest_subserver(LatestPid, Name, undefined).
+  register_latest_bcserver(LatestPid, Name, undefined).
 
 
-%%--------------------------------------------------------------------
-%% @todo add configuration param for processes count threshold
-%% @private
-%% @doc
-%% Returns active subserver to add clients to.
-%%
-%% @end
-%%--------------------------------------------------------------------
 %%----------------------------------------------------------------------
-%% Function: broadcast/2
-%% Purpose: Tells pool to broadcast nessage to all binded broadcast servers
-%% Args:   ServerName - pool process name.
-%%         Client - pid or name of the process to sent broadcast message to
-%% Returns: An atom 'ok' - basically this is a return of gen_server:cast
-%% ToDo:
+%% Function: get_current_bcserver/1
+%% Purpose: Returns latest broadcast server to deal with
+%% Args:   State - state of pool process
+%% Returns: pid of latest broadcast server
+%% TODO: add configuration param for processes count threshold
 %%----------------------------------------------------------------------
 get_current_bcserver(State) ->
-  CurPid = whereis(latest_name(State#state.broadcastSup)),
+  CurPid = whereis(State#state.currentBc),
 
-  CountSubservers = bcproc_broadcast:get_clients_count(CurPid),
-  case CountSubservers >= ?PROCESSES_TO_BCSERVER of
+  CountBcServers = bcproc_broadcast:get_clients_count(CurPid),
+  case CountBcServers >= ?PROCESSES_TO_BCSERVER of
     true ->
-      start_bcserver(State#state.broadcastSup, State#state.serverName);
+      start_bcserver(State#state.broadcastSup, State#state.serverName, State#state.currentBc);
     _ -> CurPid
   end.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Register latest started subserver under a name
-%%
-%% @end
-%%--------------------------------------------------------------------
-latest_name(SupevisorName) ->
-  list_to_atom(lists:concat([SupevisorName] ++ ['_latest_child'])).
+%%----------------------------------------------------------------------
+%% Function: latest_bcname/1
+%% Purpose: Generates name for latest broadcast server to register it under
+%% Args:   SupervisorName - name of broadcast servers' supervisor
+%% Returns: An atom with name
+%%----------------------------------------------------------------------
+latest_bcname(SupervisorName) ->
+  list_to_atom(lists:concat([SupervisorName] ++ ['_latest_child'])).
 

@@ -1,18 +1,21 @@
 %%%-------------------------------------------------------------------
-%%% @author konstantin.shamko
-%%% @copyright (C) 2015, Oxagile LLC
-%%% @doc
-%%%
-%%% @end
-%%% Created : 02. Nov 2015 2:30 PM
+%%% Description module bcproc_broadcast_sup
+%%%-------------------------------------------------------------------
+%%% Supervisor for broadcast servers
 %%%-------------------------------------------------------------------
 -module(bcproc_broadcast_sup).
--author("konstantin.shamko").
+
+-author("Konstantin Shamko").
+-author_email("konstantin.shamko@gmail.com").
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/1, start_subserver/2, get_sup_name/1]).
+-export([
+  start_link/1,
+  start_bcserver/2,
+  get_sup_name/1
+]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -23,47 +26,44 @@
 %%% API functions
 %%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the supervisor
-%%
-%% @end
-%%--------------------------------------------------------------------
+%%----------------------------------------------------------------------
+%% Function: start_link/1
+%% Purpose: Starts the supervisor
+%% Args:   SupName - supervisor name to start with
+%% Returns: A tuple {ok, Pid} or {error, Reason}
+%%----------------------------------------------------------------------
 start_link(SupName) ->
   supervisor:start_link({local, SupName}, ?MODULE, []).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the supervisor
-%%
-%% @end
-%%--------------------------------------------------------------------
-start_subserver(SupervisorName, ServerName) ->
-  supervisor:start_child(SupervisorName, [ServerName]).
+%%----------------------------------------------------------------------
+%% Function: start_bcserver/2
+%% Purpose: Starts broadcast server inside of pool with PoolServerName
+%% Args:   SupervisorName - atom with a broadcast servers' supervisor name.
+%%         PoolServerName - atom with a pool server name.
+%% Returns: A tuple {ok, Pid} or {error, Reason}
+%%----------------------------------------------------------------------
+start_bcserver(SupervisorName, PoolServerName) ->
+  supervisor:start_child(SupervisorName, [PoolServerName]).
 
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the supervisor
-%%
-%% @end
-%%--------------------------------------------------------------------
-get_sup_name(ServerName) ->
-  list_to_atom(lists:concat([ServerName] ++ ['_sup'])).
+%%----------------------------------------------------------------------
+%% Function: get_sup_name/1
+%% Purpose: Generates name of supervisor based on pool name
+%% Args:   PoolName - atom with a pool name.
+%% Returns: An atom
+%%----------------------------------------------------------------------
+get_sup_name(PoolName) ->
+  list_to_atom(lists:concat([PoolName] ++ ['_sup'])).
 
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
 
 %%--------------------------------------------------------------------
-%% @private
-%% @doc
 %% Whenever a supervisor is started using supervisor:start_link/[2,3],
 %% this function is called by the new process to find out about
 %% restart strategy, maximum restart frequency and child
 %% specifications.
-%%
-%% @end
 %%--------------------------------------------------------------------
 init([]) ->
   MaxRestarts = 5,
@@ -71,8 +71,3 @@ init([]) ->
   {ok, {{simple_one_for_one, MaxRestarts, MaxTime}, [
     {bcproc_broadcast, {bcproc_broadcast, start_link, []}, transient, 2000, worker, [bcproc_broadcast]}
   ]}}.
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
-

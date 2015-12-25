@@ -18,9 +18,9 @@
 %%%-------------------------------------------------------------------
 %%% LIST OF TO DOes
 %%%-------------------------------------------------------------------
-%%% - bcproc_bpool:handle_cast({remove_client, ClientPid}, State)
-%%%
-%%%
+%%% - bcproc_bpool:get_current_bcserver/1
+%%% - bcproc_broadcast, ?CLEANUP_TIME
+%%% - improve cleaner (or do smth else) to change current broadcast server to a server with less clients
 %%%-------------------------------------------------------------------
 -module(bcproc).
 
