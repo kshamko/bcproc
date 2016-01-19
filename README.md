@@ -5,6 +5,8 @@ broadcast messages to every process inside.
 
 Usage example:
 
+```erlang
  bcproc:start_server(broadcast_server_name),
  bcproc:add_client(broadcast_server_name, Pid),
  bcproc:broadcast(broadcast_server_name, Message).
+```
