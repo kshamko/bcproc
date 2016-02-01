@@ -70,7 +70,7 @@ add_client(Proc, Client) ->
   gen_server:cast(Proc, {add_client, Client}).
 
 %%----------------------------------------------------------------------
-%% Function: remove_client/2
+%% Function: terminate_client/2
 %% Purpose: Removes client (Pid or Name) from the broadcast server
 %% Args:   Proc  - name or pid of broadcast server
 %%         Client - pid or name of the process to sent broadcast message to and which was
