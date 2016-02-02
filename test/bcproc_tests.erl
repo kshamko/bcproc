@@ -60,6 +60,15 @@ broadcast_test_() ->
     }
   }.
 
+cleaner_test_() ->
+  {"Test cleaner of dead processes",
+    {setup,
+      fun start_bc_with_clients/0,
+      fun stop_bc/1,
+      fun clean/1
+    }
+  }.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% SETUP FUNCTIONS %%%
@@ -123,11 +132,19 @@ process_not_exists({BcName, Pid}) ->
 clients_added({BcName, _Pid, Clients}) ->
   SupName = bcproc_broadcast_sup:get_sup_name(BcName),
   LatestPool = test_broadcast_sup_latest_child,
+  CountClients1 = bcproc_broadcast:get_clients_count(LatestPool),
+
+  [ClientToAdd] = lists:sublist(Clients, 1, 1),
+  bcproc:add_client(BcName, ClientToAdd),
+  timer:sleep(500),
+
+  CountClients2 = bcproc_broadcast:get_clients_count(LatestPool),
 
   [_,_,_,{workers, CountWorkers}] = supervisor:count_children(SupName),
 
   [
-    ?_assertEqual(150, bcproc_broadcast:get_clients_count(LatestPool)),
+    ?_assertEqual(150, CountClients1),
+    ?_assertEqual(150, CountClients2),
     ?_assertEqual(test_broadcast_sup, SupName),
     ?_assertEqual(2, CountWorkers)
   ].
@@ -157,7 +174,39 @@ broadcast({BcName, _Pid, Clients}) ->
   [{count, Count}] = ets:lookup(bcast, count),
 
   [
-    ?_assertEqual(410, Count)
+    ?_assertEqual(400, Count)
+  ].
+
+%%============================================
+%%
+%%============================================
+clean({_BcName, _Pid, Clients}) ->
+
+  [ClientToKill] = lists:sublist(Clients, 19, 1),
+  exit(ClientToKill, kill),
+  LatestPool = test_broadcast_sup_latest_child,
+
+  {ok, CleanerPid} = bcproc_cleaner_sup:start_cleaner(),
+  {state, _A, ClientsDict, _BcName} = sys:get_state(LatestPool),
+
+  bcproc_cleaner_server:clean(CleanerPid, ClientsDict, LatestPool),
+  timer:sleep(500),
+  CountClients1 = bcproc_broadcast:get_clients_count(LatestPool),
+
+  [ClientToKill1] = lists:sublist(Clients, 99, 1),
+  exit(ClientToKill1, kill),
+  LatestPool ! cleanup,
+  timer:sleep(500),
+  CountClients2 = bcproc_broadcast:get_clients_count(LatestPool),
+
+  bcproc_broadcast:set_clean_pids(LatestPool, dict:new(), 0),
+  timer:sleep(100),
+  CountClients3 = bcproc_broadcast:get_clients_count(LatestPool),
+
+  [
+    ?_assertEqual(149, CountClients1),
+    ?_assertEqual(148, CountClients2),
+    ?_assertEqual(0, CountClients3)
   ].
 
 
@@ -167,7 +216,7 @@ broadcast({BcName, _Pid, Clients}) ->
 remove_client([Client|Clients], BcName) ->
   bcproc:remove_client(BcName, Client),
   remove_client(Clients, BcName);
-remove_client([], BcName) ->
+remove_client([], _BcName) ->
   timer:sleep(1*1000),
   done.
 
