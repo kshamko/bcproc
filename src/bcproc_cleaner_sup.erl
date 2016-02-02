@@ -1,13 +1,12 @@
 %%%-------------------------------------------------------------------
-%%% @author konstantin.shamko
-%%% @copyright (C) 2015
-%%% @doc
-%%%
-%%% @end
-%%% Created : 09. Nov 2015 1:50 PM
+%%% Description module bcproc_broadcast_sup
+%%%-------------------------------------------------------------------
+%%% Supervisor for clients cleaner
 %%%-------------------------------------------------------------------
 -module(bcproc_cleaner_sup).
--author("konstantin.shamko").
+
+-author("Konstantin Shamko").
+-author_email("konstantin.shamko@gmail.com").
 
 -behaviour(supervisor).
 
@@ -63,7 +62,3 @@ start_cleaner() ->
     {ok, {{simple_one_for_one, MaxRestarts, MaxTime}, [
       {bcproc_cleaner_server, {bcproc_cleaner_server, start_link, []}, transient, 2000, worker, [bcproc_cleaner_server]}
     ]}}.
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================

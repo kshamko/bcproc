@@ -6,7 +6,6 @@ broadcast messages to each process inside.
 Usage example:
 
 ```erlang
-
 % start a pool of processes to broadcast to
  bcproc:start_server(broadcast_server_name),
  
@@ -17,5 +16,5 @@ Usage example:
  bcproc:broadcast(broadcast_server_name, Message).
 
 ```
-
 Each process will get a message like *{bcproc, Message}* which can be handled with *handle_info* functions of gen_* behaviours
+

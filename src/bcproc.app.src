@@ -1,6 +1,6 @@
 {application, bcproc,
  [
-  {description, ""},
+  {description, "Library implements message broadcast feature to multiple processes"},
   {vsn, "0.0.1"},
   {registered, []},
   {applications, [
